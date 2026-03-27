@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AS-06 MISSION PLANNER FOR QUADCOPTER</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --green: #2ea043;
+      --yellow: #d29922;
+      --orange: #e3722a;
+      --red: #da3633;
+      --blue: #388bfd;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green-dim: #0f2d17;
+      --yellow-dim: #2a1f00;
+      --red-dim: #2d0f0f;
+      --orange-dim: #2a1500;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh
+    }
+
+    /* TOP BAR */
+    #topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100
+    }
+
+    #topbar .title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--text)
+    }
+
+    #topbar .title span {
+      color: var(--blue)
+    }
+
+    #conn-pill {
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all .3s
+    }
+
+    .conn-connected {
+      background: var(--green-dim);
+      color: var(--green);
+      border: 1px solid var(--green)
+    }
+
+    .conn-bridge {
+      background: var(--yellow-dim);
+      color: var(--yellow);
+      border: 1px solid var(--yellow)
+    }
+
+    .conn-disconnected {
+      background: var(--red-dim);
+      color: var(--red);
+      border: 1px solid var(--red)
+    }
+
+    #uptime {
+      font-family: monospace;
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    /* LAYOUT */
+    #main {
+      display: grid;
+      grid-template-columns: 60% 40%;
+      gap: 0;
+      height: calc(100vh - 49px)
+    }
+
+    @media(max-width:768px) {
+      #main {
+        grid-template-columns: 1fr;
+        height: auto
+      }
+    }
+
+    /* LEFT — MAP */
+    #map-col {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column
+    }
+
+    #map-wrap {
+      flex: 1;
+      position: relative;
+      background: #0a0e14;
+      overflow: hidden
+    }
+
+    #mapCanvas {
+      width: 100%;
+      height: 100%;
+      display: block
+    }
+
+    #map-info {
+      padding: 8px 12px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 20px
+    }
+
+    /* RIGHT — PANELS */
+    #right-col {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0
+    }
+
+    .panel {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      transition: background .3s
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px
+    }
+
+    /* STATE PANEL */
+    #state-badge {
+      display: inline-block;
+      padding: 4px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 15px;
+      margin-bottom: 10px;
+      transition: all .3s
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 8px
+    }
+
+    .metric {
+      background: var(--bg);
+      border-radius: 6px;
+      padding: 8px;
+      text-align: center
+    }
+
+    .metric .val {
+      font-family: monospace;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text)
+    }
+
+    .metric .lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px
+    }
+
+    #compass-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    #compassCanvas {
+      border-radius: 50%;
+      background: #0a0e14
+    }
+
+    /* BATTERY */
+    #batt-row {
+      display: flex;
+      align-items: center;
+      gap: 12px
+    }
+
+    #batt-icon {
+      width: 60px;
+      height: 28px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      position: relative;
+      background: var(--bg)
+    }
+
+    #batt-icon::after {
+      content: '';
+      position: absolute;
+      right: -7px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 5px;
+      height: 12px;
+      background: var(--border);
+      border-radius: 0 2px 2px 0
+    }
+
+    #batt-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: all .5s
+    }
+
+    #batt-text {
+      font-family: monospace;
+      font-size: 16px;
+      font-weight: 700
+    }
+
+    .batt-warn {
+      background: var(--yellow-dim);
+      color: var(--yellow);
+      border: 1px solid var(--yellow);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+      display: none
+    }
+
+    /* TRUST BARS */
+    .trust-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px
+    }
+
+    .trust-lbl {
+      width: 44px;
+      font-size: 11px;
+      color: var(--muted)
+    }
+
+    .trust-bar-bg {
+      flex: 1;
+      height: 10px;
+      background: var(--bg);
+      border-radius: 5px;
+      overflow: hidden
+    }
+
+    .trust-bar-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width .4s, background .4s
+    }
+
+    .trust-val {
+      width: 32px;
+      font-family: monospace;
+      font-size: 11px;
+      text-align: right;
+      color: var(--muted)
+    }
+
+    /* SA PANEL */
+    #sa-box {
+      border-radius: 6px;
+      padding: 10px;
+      transition: background .3s, border .3s;
+      border: 1px solid var(--border);
+      min-height: 40px
+    }
+
+    #sa-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px
+    }
+
+    .sa-pill {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600
+    }
+
+    /* WIND PANEL */
+    .wind-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px
+    }
+
+    .noise-bar-wrap {
+      margin-bottom: 6px
+    }
+
+    .noise-bar-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 3px;
+      display: flex;
+      justify-content: space-between
+    }
+
+    .noise-bar-bg {
+      height: 8px;
+      background: var(--bg);
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden
+    }
+
+    .noise-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width .3s
+    }
+
+    .noise-threshold {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 2px;
+      background: var(--red);
+      opacity: .7
+    }
+
+    /* LIDAR PANEL */
+    #lidar-dist {
+      font-family: monospace;
+      font-size: 36px;
+      font-weight: 700;
+      text-align: center;
+      padding: 8px
+    }
+
+    /* MISSION CONTROL */
+    #mission-panel {
+      padding: 14px 16px
+    }
+
+    .coord-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px
+    }
+
+    .inp-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px
+    }
+
+    .inp-group label {
+      font-size: 11px;
+      color: var(--muted)
+    }
+
+    .inp-group input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      color: var(--text);
+      font-family: monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border .2s
+    }
+
+    .inp-group input:focus {
+      border-color: var(--blue)
+    }
+
+    .alt-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px
+    }
+
+    .helper {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 10px
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      flex: 1
+    }
+
+    .btn:disabled {
+      opacity: .4;
+      cursor: not-allowed
+    }
+
+    .btn-green {
+      background: var(--green);
+      color: #fff
+    }
+
+    .btn-green:hover:not(:disabled) {
+      background: #3fb950
+    }
+
+    .btn-orange {
+      background: var(--orange);
+      color: #fff
+    }
+
+    .btn-orange:hover:not(:disabled) {
+      filter: brightness(1.15)
+    }
+
+    .btn-red {
+      background: var(--red);
+      color: #fff
+    }
+
+    .btn-red:hover:not(:disabled) {
+      filter: brightness(1.15)
+    }
+
+    .btn-gray {
+      background: var(--border);
+      color: var(--text);
+      font-size: 11px
+    }
+
+    /* WAYPOINT LIST */
+    #wp-list-wrap {
+      overflow: hidden;
+      transition: max-height .3s
+    }
+
+    #wp-list {
+      padding: 0;
+      list-style: none;
+      font-size: 12px;
+      font-family: monospace;
+      max-height: 120px;
+      overflow-y: auto
+    }
+
+    #wp-list li {
+      padding: 4px 8px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted)
+    }
+
+    #wp-list li.active {
+      background: var(--yellow-dim);
+      color: var(--yellow)
+    }
+
+    /* LOG */
+    #log-wrap {
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+      transition: max-height .3s
+    }
+
+    #log {
+      height: 120px;
+      overflow-y: auto;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg)
+    }
+
+    #log .log-line {
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .log-ts {
+      color: var(--border)
+    }
+
+    /* SPINNER */
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255, 255, 255, .3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    /* MODAL */
+    #modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999
+    }
+
+    #modal-overlay.show {
+      display: flex
+    }
+
+    #modal {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      max-width: 360px;
+      width: 90%;
+      text-align: center
+    }
+
+    #modal h3 {
+      margin-bottom: 10px;
+      font-size: 16px
+    }
+
+    #modal p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 20px
+    }
+
+    #modal .modal-btns {
+      display: flex;
+      gap: 10px;
+      justify-content: center
+    }
+
+    /* SCROLL */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg)
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px
+    }
+
+    .collapsible-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 4px 0
+    }
+
+    .wp-label {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      color: #fff;
+      font-size: 8px;
+      font-weight: bold;
+      margin-left: -4px;
+      margin-top: -6px;
+      text-shadow: 1px 1px 1px #000, -1px -1px 1px #000;
+    }
+
+    .dark-text {
+      color: #000 !important;
+      text-shadow: none !important;
+    }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+
+<body>
+
+  <!-- TOP BAR -->
+  <div id="topbar">
+    <div class="title">AS-06 <span>MISSION PLANNER</span> FOR QUADCOPTER</div>
+    <div id="conn-pill" class="conn-disconnected">DISCONNECTED</div>
+    <div id="uptime">Uptime: --</div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div id="main">
+
+    <!-- LEFT: MAP -->
+    <div id="map-col">
+      <div id="map-wrap">
+        <canvas id="mapWindCanvas" width="80" height="80"
+          style="position:absolute;top:10px;right:50px;z-index:1000;pointer-events:none;"></canvas>
+      </div>
+      <div id="map-info">
+        <span>N: <b id="mi-north">0.00</b>m</span>
+        <span>E: <b id="mi-east">0.00</b>m</span>
+        <span>Alt: <b id="mi-alt">0.00</b>m</span>
+        <span>WP: <b id="mi-wp">0</b></span>
+      </div>
+    </div>
+
+    <!-- RIGHT: PANELS -->
+    <div id="right-col">
+
+      <!-- PANEL 1: FLIGHT STATE -->
+      <div class="panel">
+        <div class="panel-title">Flight State</div>
+        <div id="state-badge">IDLE</div>
+        <div class="grid-3">
+          <div class="metric">
+            <div class="val" id="m-alt">0.0</div>
+            <div class="lbl">Alt (m)</div>
+          </div>
+          <div class="metric">
+            <div class="val" id="m-vx">0.0</div>
+            <div class="lbl">Vx (m/s)</div>
+          </div>
+          <div class="metric">
+            <div class="val" id="m-vy">0.0</div>
+            <div class="lbl">Vy (m/s)</div>
+          </div>
+        </div>
+        <div id="compass-wrap">
+          <canvas id="compassCanvas" width="60" height="60"></canvas>
+          <div style="font-family:monospace;font-size:20px;font-weight:700" id="m-yaw">0°</div>
+          <div style="font-size:11px;color:var(--muted)">Heading</div>
+        </div>
+      </div>
+
+      <!-- PANEL 2: BATTERY -->
+      <div class="panel">
+        <div class="panel-title">Battery</div>
+        <div class="batt-row" style="display:flex;align-items:center;gap:12px">
+          <div id="batt-icon">
+            <div id="batt-fill"></div>
+          </div>
+          <div id="batt-text">--V (--%)</div>
+        </div>
+        <div id="batt-warn" class="batt-warn">⚠ BATTERY LOW</div>
+        <div id="batt-crit" class="batt-warn"
+          style="background:var(--red-dim);color:var(--red);border-color:var(--red)">🔴 CRITICAL — LAND NOW</div>
+      </div>
+
+      <!-- PANEL 3: SENSOR TRUST -->
+      <div class="panel">
+        <div class="panel-title">Sensor Trust Scores</div>
+        <div id="trust-degrade" style="color:var(--yellow);font-size:11px;margin-bottom:8px;display:none">⚠ SENSOR
+          DEGRADED</div>
+        <div class="trust-row"><span class="trust-lbl">IMU</span>
+          <div class="trust-bar-bg">
+            <div class="trust-bar-fill" id="tb-imu"></div>
+          </div><span class="trust-val" id="tv-imu">1.0</span>
+        </div>
+        <div class="trust-row"><span class="trust-lbl">Baro</span>
+          <div class="trust-bar-bg">
+            <div class="trust-bar-fill" id="tb-baro"></div>
+          </div><span class="trust-val" id="tv-baro">1.0</span>
+        </div>
+        <div class="trust-row"><span class="trust-lbl">Mag</span>
+          <div class="trust-bar-bg">
+            <div class="trust-bar-fill" id="tb-mag"></div>
+          </div><span class="trust-val" id="tv-mag">1.0</span>
+        </div>
+        <div class="trust-row"><span class="trust-lbl">Flow</span>
+          <div class="trust-bar-bg">
+            <div class="trust-bar-fill" id="tb-flow"></div>
+          </div><span class="trust-val" id="tv-flow">1.0</span>
+        </div>
+        <div class="trust-row"><span class="trust-lbl">LiDAR</span>
+          <div class="trust-bar-bg">
+            <div class="trust-bar-fill" id="tb-lidar"></div>
+          </div><span class="trust-val" id="tv-lidar">1.0</span>
+        </div>
+      </div>
+
+      <!-- PANEL 4: SITUATIONAL AWARENESS -->
+      <div class="panel">
+        <div class="panel-title">Situational Awareness</div>
+        <div id="sa-box">
+          <div id="sa-text" style="font-weight:600;font-size:13px">NOMINAL</div>
+          <div id="sa-pills"></div>
+        </div>
+      </div>
+
+      <!-- PANEL 5: WIND + VIBRATION -->
+      <div class="panel">
+        <div class="panel-title">Wind &amp; Vibration</div>
+        <div class="wind-row">
+          <canvas id="windCanvas" width="50" height="50"></canvas>
+          <div>
+            <div style="font-family:monospace;font-size:20px;font-weight:700" id="wind-spd">0.0 m/s</div>
+            <div style="font-size:11px;color:var(--muted)" id="wind-dir">—</div>
+          </div>
+          <div id="wind-warn"
+            style="display:none;background:var(--orange-dim);color:var(--orange);border:1px solid var(--orange);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;margin-left:auto">
+            HIGH WIND — HOLDING</div>
+        </div>
+        <div class="noise-bar-wrap">
+          <div class="noise-bar-label"><span>Accel RMS</span><span id="noise-ax-val">0.000 m/s²</span></div>
+          <div class="noise-bar-bg">
+            <div class="noise-bar-fill" id="noise-ax-fill"></div>
+            <div class="noise-threshold" id="noise-ax-thresh" style="left:0"></div>
+          </div>
+        </div>
+        <div class="noise-bar-wrap" style="margin-top:6px">
+          <div class="noise-bar-label"><span>Gyro RMS</span><span id="noise-gz-val">0.000 rad/s</span></div>
+          <div class="noise-bar-bg">
+            <div class="noise-bar-fill" id="noise-gz-fill"></div>
+            <div class="noise-threshold" id="noise-gz-thresh" style="left:0"></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Noise events: <b id="noise-events">0</b></div>
+      </div>
+
+      <!-- PANEL 6: LIDAR -->
+      <div class="panel" id="lidar-panel">
+        <div class="panel-title">LiDAR Obstacle</div>
+        <div id="lidar-dist">--.- m</div>
+        <div id="lidar-warn" style="display:none;text-align:center;color:var(--red);font-weight:700;font-size:13px">⚠
+          OBSTACLE DETECTED</div>
+      </div>
+
+      <!-- MISSION CONTROL -->
+      <div id="mission-panel">
+        <div class="panel-title">Mission Coordinates</div>
+        <div class="coord-grid">
+          <div class="inp-group"><label>Start Lat</label><input type="number" id="latS" step="any"
+              placeholder="12.971598"></div>
+          <div class="inp-group"><label>Start Lon</label><input type="number" id="lonS" step="any"
+              placeholder="77.594566"></div>
+          <div class="inp-group"><label>Dest Lat</label><input type="number" id="latD" step="any"
+              placeholder="12.972500"></div>
+          <div class="inp-group"><label>Dest Lon</label><input type="number" id="lonD" step="any"
+              placeholder="77.595800"></div>
+        </div>
+        <div class="alt-row">
+          <div class="inp-group" style="flex:1"><label>Altitude (m)</label><input type="number" id="alt" value="5.0"
+              step="0.5" min="1" max="30"></div>
+          <button class="btn btn-gray" onclick="prefillStart()" style="margin-top:18px;flex:none;padding:8px 10px">Use
+            home as start</button>
+        </div>
+        <div class="helper">Right-click any point on Google Maps → coordinates appear</div>
+        <div class="btn-row">
+          <button class="btn btn-green" id="btn-launch" onclick="launchMission()">Launch Mission</button>
+          <button class="btn btn-orange" id="btn-rth" onclick="sendRTH()" disabled>Return Home</button>
+          <button class="btn btn-red" id="btn-abort" onclick="sendAbort()" disabled>ABORT</button>
+        </div>
+        <button class="collapsible-btn" onclick="toggleWP()">▾ Waypoints</button>
+        <div id="wp-list-wrap">
+          <ul id="wp-list">
+            <li style="color:var(--muted);padding:4px 8px">No mission active</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- LOG -->
+      <div id="log-wrap">
+        <div
+          style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px;border-top:1px solid var(--border)">
+          <button class="collapsible-btn" onclick="toggleLog()">▾ Telemetry Log</button>
+          <button class="collapsible-btn" onclick="exportCSV()">Export CSV</button>
+        </div>
+        <div id="log"></div>
+      </div>
+
+    </div><!-- end right-col -->
+  </div><!-- end main -->
+
+  <!-- MODAL -->
+  <div id="modal-overlay">
+    <div id="modal">
+      <h3 id="modal-title">Confirm</h3>
+      <p id="modal-msg">Are you sure?</p>
+      <div class="modal-btns">
+        <button class="btn btn-red" id="modal-confirm" style="flex:none;padding:8px 24px">Confirm</button>
+        <button class="btn btn-gray" onclick="closeModal()" style="flex:none;padding:8px 24px">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ────────────────────────────────────────────────────────────
+    //  STATE
+    // ────────────────────────────────────────────────────────────
+    let ws = null;
+    let telem = {};
+    let logData = [];
+    let path = [];          // flight path breadcrumbs [{n,e}]
+    let wpList = [];        // waypoints from mission
+    let missionLaunched = false;
+    let wsConnected = false;
+    let esp32OK = false;
+    let reconnectTimer = null;
+
+    const STATE_NAMES = ['IDLE', 'ARMING', 'FLYING', 'RTH', 'COMPLETE', 'ABORT'];
+    const STATE_COLORS = ['#666', '#d29922', '#2ea043', '#e3722a', '#388bfd', '#da3633'];
+
+    // ────────────────────────────────────────────────────────────
+    //  WEBSOCKET
+    // ────────────────────────────────────────────────────────────
+    function connect() {
+      if (ws) { try { ws.close(); } catch (e) { } }
+      ws = new WebSocket('ws://localhost:8765');
+
+      ws.onopen = () => {
+        wsConnected = true;
+        clearTimeout(reconnectTimer);
+        setConnPill('bridge');
+        addLog('Bridge connected');
+      };
+
+      ws.onmessage = (evt) => {
+        let data;
+        try { data = JSON.parse(evt.data); } catch (e) { return; }
+
+        if (data._bridge) {
+          esp32OK = data.esp32Reachable;
+          setConnPill(esp32OK ? 'connected' : 'bridge');
+          return;
+        }
+        if (data._cmdResponse) {
+          addLog(`CMD response: ${data.body || data.error}`);
+          return;
+        }
+        if (data.error === 'esp32_unreachable') {
+          esp32OK = false;
+          setConnPill('bridge');
+          return;
+        }
+
+        // Valid telemetry
+        esp32OK = true;
+        setConnPill('connected');
+        telem = data;
+        updateAll(data);
+        addLog(JSON.stringify({
+          st: data.state, N: data.north?.toFixed(1),
+          E: data.east?.toFixed(1), Z: data.alt?.toFixed(1),
+          batt: data.battPct?.toFixed(0) + '%', sa: data.situation
+        }));
+      };
+
+      ws.onclose = () => {
+        wsConnected = false; esp32OK = false;
+        setConnPill('disconnected');
+        addLog('Bridge disconnected — retrying in 3s...');
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+
+      ws.onerror = () => { };
+    }
+
+    function sendCmd(cmd) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert('Not connected to bridge. Run: node bridge.js');
+        return;
+      }
+      ws.send(JSON.stringify(cmd));
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  UI UPDATES
+    // ────────────────────────────────────────────────────────────
+    function setConnPill(state) {
+      const el = document.getElementById('conn-pill');
+      el.className = 'conn-pill';
+      if (state === 'connected') {
+        el.textContent = '● CONNECTED';
+        el.className = 'conn-pill conn-connected';
+      } else if (state === 'bridge') {
+        el.textContent = '◐ BRIDGE ONLY';
+        el.className = 'conn-pill conn-bridge';
+      } else {
+        el.textContent = '○ DISCONNECTED';
+        el.className = 'conn-pill conn-disconnected';
+      }
+    }
+
+    function updateAll(d) {
+      // Uptime
+      const u = d.uptime || 0;
+      document.getElementById('uptime').textContent =
+        `Uptime: ${String(Math.floor(u / 3600)).padStart(2, '0')}:${String(Math.floor((u % 3600) / 60)).padStart(2, '0')}:${String(u % 60).padStart(2, '0')}`;
+
+      // State badge
+      const sb = document.getElementById('state-badge');
+      const st = d.state || 0;
+      sb.textContent = STATE_NAMES[st] || 'UNKNOWN';
+      sb.style.background = STATE_COLORS[st] + '22';
+      sb.style.color = STATE_COLORS[st];
+      sb.style.border = `1px solid ${STATE_COLORS[st]}`;
+
+      // Metrics
+      set('m-alt', (d.alt || 0).toFixed(1));
+      set('m-vx', (d.vx || 0).toFixed(2));
+      set('m-vy', (d.vy || 0).toFixed(2));
+      set('m-yaw', ((d.yaw || 0).toFixed(1)) + '°');
+      set('mi-north', (d.north || 0).toFixed(2));
+      set('mi-east', (d.east || 0).toFixed(2));
+      set('mi-alt', (d.alt || 0).toFixed(2));
+      set('mi-wp', d.wp || 0);
+
+      // Compass
+      drawCompass(d.yaw || 0);
+
+      // Battery
+      const pct = d.battPct || 0;
+      const fill = document.getElementById('batt-fill');
+      fill.style.width = pct + '%';
+      fill.style.background = pct > 60 ? 'var(--green)' : pct > 30 ? 'var(--yellow)' : 'var(--red)';
+      document.getElementById('batt-text').textContent =
+        `${(d.battV || 0).toFixed(2)}V (${pct.toFixed(0)}%)`;
+      document.getElementById('batt-warn').style.display = d.battWarn && !d.battCrit ? 'block' : 'none';
+      document.getElementById('batt-crit').style.display = d.battCrit ? 'block' : 'none';
+
+      // Trust bars
+      updateTrust('imu', d.trustIMU);
+      updateTrust('baro', d.trustBaro);
+      updateTrust('mag', d.trustMag);
+      updateTrust('flow', d.trustFlow);
+      updateTrust('lidar', d.trustLidar);
+      const minT = Math.min(d.trustIMU || 1, d.trustBaro || 1, d.trustMag || 1, d.trustFlow || 1);
+      document.getElementById('trust-degrade').style.display = minT < 0.4 ? 'block' : 'none';
+
+      // SA
+      updateSA(d.situation || 'NOMINAL', d.situationCode || 0);
+
+      // Wind
+      document.getElementById('wind-spd').textContent = (d.windSpd || 0).toFixed(1) + ' m/s';
+      const wdir = windDirStr(d.windN || 0, d.windE || 0);
+      document.getElementById('wind-dir').textContent = wdir;
+      document.getElementById('wind-warn').style.display = d.windHigh ? 'flex' : 'none';
+      drawWindArrow(d.windN || 0, d.windE || 0, d.windSpd || 0);
+
+      // Noise bars
+      const axMax = 2.0, gzMax = 0.5;
+      const axPct = Math.min((d.noiseRmsAx || 0) / axMax * 100, 100);
+      const gzPct = Math.min((d.noiseRmsGz || 0) / gzMax * 100, 100);
+      const axThreshPct = (0.8 / axMax * 100);
+      const gzThreshPct = (0.15 / gzMax * 100);
+      const axFill = document.getElementById('noise-ax-fill');
+      const gzFill = document.getElementById('noise-gz-fill');
+      axFill.style.width = axPct + '%';
+      axFill.style.background = (d.noiseRmsAx || 0) > 0.8 ? 'var(--red)' : 'var(--green)';
+      gzFill.style.width = gzPct + '%';
+      gzFill.style.background = (d.noiseRmsGz || 0) > 0.15 ? 'var(--red)' : 'var(--green)';
+      document.getElementById('noise-ax-thresh').style.left = axThreshPct + '%';
+      document.getElementById('noise-gz-thresh').style.left = gzThreshPct + '%';
+      document.getElementById('noise-ax-val').textContent = (d.noiseRmsAx || 0).toFixed(3) + ' m/s²';
+      document.getElementById('noise-gz-val').textContent = (d.noiseRmsGz || 0).toFixed(3) + ' rad/s';
+      document.getElementById('noise-events').textContent = d.noiseEvents || 0;
+
+      // LiDAR
+      const lidarEl = document.getElementById('lidar-panel');
+      document.getElementById('lidar-dist').textContent = (d.lidar || 0).toFixed(1) + ' m';
+      document.getElementById('lidar-warn').style.display = d.obstacle ? 'block' : 'none';
+      lidarEl.style.background = d.obstacle ? 'var(--red-dim)' : 'var(--panel)';
+
+      // Buttons
+      document.getElementById('btn-launch').disabled = st !== 0;
+      document.getElementById('btn-rth').disabled = st !== 2;
+      document.getElementById('btn-abort').disabled = st !== 2 && st !== 3;
+
+      // Map
+      if (d.north !== undefined) {
+        path.push({ n: d.north, e: d.east });
+        if (path.length > 2000) path.shift();
+      }
+      drawMap(d);
+    }
+
+    function set(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
+    function updateTrust(name, val) {
+      const v = val || 1;
+      const pct = (v * 100).toFixed(0);
+      const fill = document.getElementById('tb-' + name);
+      const txt = document.getElementById('tv-' + name);
+      if (!fill) return;
+      fill.style.width = pct + '%';
+      fill.style.background = v > 0.7 ? 'var(--green)' : v > 0.4 ? 'var(--yellow)' : 'var(--red)';
+      txt.textContent = v.toFixed(2);
+    }
+
+    function updateSA(situation, code) {
+      const box = document.getElementById('sa-box');
+      const txt = document.getElementById('sa-text');
+      const pills = document.getElementById('sa-pills');
+      txt.textContent = situation;
+      if (situation === 'NOMINAL') {
+        box.style.background = 'var(--green-dim)';
+        box.style.borderColor = 'var(--green)';
+      } else if (code & (1 | 8 | 16)) {
+        box.style.background = 'var(--red-dim)';
+        box.style.borderColor = 'var(--red)';
+      } else {
+        box.style.background = 'var(--yellow-dim)';
+        box.style.borderColor = 'var(--yellow)';
+      }
+      const parts = situation.split(' ').filter(Boolean);
+      pills.innerHTML = parts.filter(p => p !== 'NOMINAL').map(p => {
+        const c = p.includes('CRIT') || p.includes('OBSTACLE') ? 'var(--red)' :
+          p.includes('WIND') || p.includes('UNSTABLE') ? 'var(--orange)' : 'var(--yellow)';
+        return `<span class="sa-pill" style="background:${c}22;color:${c};border:1px solid ${c}">${p}</span>`;
+      }).join('');
+    }
+
+    function windDirStr(n, e) {
+      if (Math.abs(n) < 0.1 && Math.abs(e) < 0.1) return 'Calm';
+      const deg = Math.atan2(e, n) * 180 / Math.PI;
+      const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      return dirs[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  CANVAS DRAWINGS
+    // ────────────────────────────────────────────────────────────
+    function drawCompass(yawDeg) {
+      const c = document.getElementById('compassCanvas');
+      const ctx = c.getContext('2d');
+      const cx = 30, cy = 30, r = 26;
+      ctx.clearRect(0, 0, 60, 60);
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#30363d'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#0a0e14'; ctx.fill();
+      // N marker
+      ctx.fillStyle = '#8b949e'; ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('N', cx, cy - r + 9);
+      // Needle
+      const rad = (yawDeg - 90) * Math.PI / 180;
+      const nx = cx + (r - 6) * Math.cos(rad);
+      const ny = cy + (r - 6) * Math.sin(rad);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(nx, ny);
+      ctx.strokeStyle = '#e3722a'; ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#e3722a'; ctx.fill();
+    }
+
+    function drawWindArrow(wn, we, spd) {
+      const c = document.getElementById('windCanvas');
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, 50, 50);
+      const cx = 25, cy = 25;
+      ctx.beginPath(); ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+      ctx.strokeStyle = '#30363d'; ctx.lineWidth = 1; ctx.stroke();
+      if (spd < 0.1) return;
+      const angle = Math.atan2(we, wn);
+      const len = Math.min(spd / 8 * 18, 18);
+      const ex = cx + Math.cos(angle) * len;
+      const ey = cy + Math.sin(angle) * len;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey);
+      ctx.strokeStyle = spd > 4 ? 'var(--red)' : 'var(--blue)';
+      ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
+      // Arrowhead
+      const hw = 5;
+      const ax1 = ex + Math.cos(angle + 2.5) * hw, ay1 = ey + Math.sin(angle + 2.5) * hw;
+      const ax2 = ex + Math.cos(angle - 2.5) * hw, ay2 = ey + Math.sin(angle - 2.5) * hw;
+      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ax1, ay1); ctx.lineTo(ax2, ay2);
+      ctx.closePath(); ctx.fillStyle = spd > 4 ? 'var(--red)' : 'var(--blue)'; ctx.fill();
+    }
+
+    // ── MAP ──────────────────────────────────────────────────────
+    let lfMap = null;
+    let lfDroneMarker = null;
+    let lfDronePath = null;
+    let lfPathCoords = [];
+    let lfWpMarkers = [];
+
+    function getHomeGlobal() {
+      let hl = parseFloat(document.getElementById('latS').value);
+      let hE = parseFloat(document.getElementById('lonS').value);
+      if (isNaN(hl) || isNaN(hE)) {
+        hl = 12.971598; // Default generic fallback location
+        hE = 77.594566;
+      }
+      return { lat: hl, lon: hE };
+    }
+
+    function localToGlobal(n, e) {
+      const home = getHomeGlobal();
+      const latRatio = 111139;
+      const lonRatio = 111139 * Math.cos(home.lat * Math.PI / 180);
+      return [home.lat + (n / latRatio), home.lon + (e / lonRatio)];
+    }
+
+    function initLfMap() {
+      lfMap = L.map('map-wrap', { zoomControl: false }).setView([0, 0], 2);
+      L.control.zoom({ position: 'bottomright' }).addTo(lfMap);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19, attribution: '© CARTO'
+      }).addTo(lfMap);
+
+      const droneHtml = `<div style="width:24px;height:24px;position:relative;">
+      <div style="position:absolute;top:12px;left:12px;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:16px solid var(--green);transform:translate(-50%,-100%);"></div>
+    </div>`;
+      const divIcon = L.divIcon({ html: droneHtml, className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
+      lfDroneMarker = L.marker([0, 0], { icon: divIcon, zIndexOffset: 1000 }).addTo(lfMap);
+      lfDronePath = L.polyline([], { color: '#388bfd', weight: 3, opacity: 0.6 }).addTo(lfMap);
+    }
+
+    function drawMap(d) {
+      if (!lfMap) initLfMap();
+
+      const currentPos = localToGlobal(d.north || 0, d.east || 0);
+
+      // Auto-center map to current pos on first update
+      if (lfPathCoords.length === 0) {
+        lfMap.setView(currentPos, 19);
+      }
+
+      // Position dronemarker
+      lfDroneMarker.setLatLng(currentPos);
+
+      // Rotate drone icon
+      const yaw = d.yaw || 0;
+      if (lfDroneMarker._icon && lfDroneMarker._icon.firstElementChild) {
+        lfDroneMarker._icon.firstElementChild.style.transform = `rotate(${yaw}deg)`;
+        if (d.obstacle) lfDroneMarker._icon.firstElementChild.querySelector('div').style.borderBottomColor = 'var(--red)';
+        else if (d.rthActive) lfDroneMarker._icon.firstElementChild.querySelector('div').style.borderBottomColor = 'var(--orange)';
+        else lfDroneMarker._icon.firstElementChild.querySelector('div').style.borderBottomColor = 'var(--green)';
+      }
+
+      // Update Flight Path
+      if (d.north !== undefined) {
+        lfPathCoords.push(currentPos);
+        if (lfPathCoords.length > 2000) lfPathCoords.shift();
+        lfDronePath.setLatLngs(lfPathCoords);
+      }
+
+      // Draw Waypoints
+      lfWpMarkers.forEach(m => lfMap.removeLayer(m));
+      lfWpMarkers = [];
+
+      if (wpList.length) {
+        wpList.forEach((wp, i) => {
+          const pos = localToGlobal(wp.n, wp.e);
+          const currentWpIdx = (d.wp || 0);
+          const active = i === currentWpIdx;
+
+          let strokeColor = '#8b949e';      // default gray for preview
+          let fillColor = '#30363d';
+
+          if (missionLaunched) {
+            if (i < currentWpIdx) {
+              // Crossed
+              strokeColor = '#2ea043';      // green
+              fillColor = '#2ea043';
+            } else if (i === currentWpIdx) {
+              // Active
+              strokeColor = '#d29922';      // yellow/orange active
+              fillColor = '#d29922';
+            } else {
+              // Future
+              strokeColor = '#ffffff';      // white
+              fillColor = '#ffffff';
+            }
+          }
+
+          const m = L.circleMarker(pos, {
+            radius: 6,
+            color: strokeColor,
+            weight: 2,
+            fillColor: fillColor,
+            fillOpacity: 1
+          }).bindTooltip(i.toString(), {
+            permanent: true, direction: 'center', className: (missionLaunched && i > currentWpIdx) ? 'wp-label dark-text' : 'wp-label'
+          }).addTo(lfMap);
+          lfWpMarkers.push(m);
+        });
+      }
+
+      // Draw Wind
+      const wCanvas = document.getElementById('mapWindCanvas');
+      const ctx = wCanvas.getContext('2d');
+      ctx.clearRect(0, 0, 80, 80);
+      const wSpd = d.windSpd || 0;
+      if (wSpd > 0.2) {
+        const wAngle = Math.atan2(d.windE || 0, d.windN || 0);
+        const wlen = Math.min(wSpd * 5, 30);
+        ctx.save(); ctx.translate(40, 40);
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(wAngle) * wlen, Math.sin(wAngle) * wlen);
+        ctx.strokeStyle = wSpd > 4 ? '#da3633' : '#388bfd';
+        ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
+        // Head
+        ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
+        ctx.fillStyle = '#8b949e'; ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center'; ctx.fillText(`${wSpd.toFixed(1)}m/s`, 0, -10);
+        ctx.restore();
+      }
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  COMMANDS
+    // ────────────────────────────────────────────────────────────
+    function previewWaypoints() {
+      const latS = parseFloat(document.getElementById('latS').value);
+      const lonS = parseFloat(document.getElementById('lonS').value);
+      const latD = parseFloat(document.getElementById('latD').value);
+      const lonD = parseFloat(document.getElementById('lonD').value);
+
+      if (isNaN(latS) || isNaN(lonS) || isNaN(latD) || isNaN(lonD)) {
+        return false;
+      }
+
+      const metersPerDeg = 111139;
+      const N = (latD - latS) * metersPerDeg;
+      const E = (lonD - lonS) * metersPerDeg * Math.cos(latS * Math.PI / 180);
+      const dist = Math.sqrt(N * N + E * E);
+      wpList = [{ n: 0, e: 0 }];
+
+      // Calculate dynamic spacing to ensure waypoints span the whole distance
+      const step = Math.max(5, dist / 48); // limit intermediate waypoints to 48
+      for (let d = step; d < dist && wpList.length < 49; d += step)
+        wpList.push({ n: N / dist * d, e: E / dist * d });
+      wpList.push({ n: N, e: E });
+      renderWPList();
+
+      if (lfMap) lfMap.fitBounds([[latS, lonS], [latD, lonD]], { padding: [50, 50], maxZoom: 18 });
+      if (telem) drawMap(telem);
+      return true;
+    }
+
+    // Auto-preview when user types coordinates
+    ['latS', 'lonS', 'latD', 'lonD'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => {
+        missionLaunched = false;
+        previewWaypoints();
+      });
+    });
+
+    async function launchMission() {
+      const alt = parseFloat(document.getElementById('alt').value);
+
+      if (!previewWaypoints()) {
+        alert('Please fill in all coordinate fields.');
+        return;
+      }
+
+      missionLaunched = true;
+      if (telem) drawMap(telem); // Redraw immediately so WPs turn white
+
+      const btn = document.getElementById('btn-launch');
+      btn.innerHTML = '<span class="spinner"></span>Launching...';
+      btn.disabled = true;
+
+      const latS = parseFloat(document.getElementById('latS').value);
+      const lonS = parseFloat(document.getElementById('lonS').value);
+      const latD = parseFloat(document.getElementById('latD').value);
+      const lonD = parseFloat(document.getElementById('lonD').value);
+      sendCmd({ cmd: 'MISSION_INIT', latS, lonS, latD, lonD, alt });
+
+      setTimeout(() => {
+        btn.innerHTML = 'Launch Mission';
+        btn.disabled = false;
+      }, 3000);
+    }
+
+    function sendRTH() {
+      openModal(
+        'Return to Home',
+        'Send RTH command? Drone will return to takeoff point and land.',
+        () => { sendCmd({ cmd: 'RTH' }); addLog('RTH command sent'); }
+      );
+    }
+
+    function sendAbort() {
+      openModal(
+        'Emergency Abort',
+        'Drone will land immediately at current position.',
+        () => { sendCmd({ cmd: 'ABORT' }); addLog('ABORT command sent'); }
+      );
+    }
+
+    function prefillStart() {
+      document.getElementById('latS').value = '0';
+      document.getElementById('lonS').value = '0';
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  WAYPOINT LIST
+    // ────────────────────────────────────────────────────────────
+    function renderWPList() {
+      const ul = document.getElementById('wp-list');
+      if (!wpList.length) {
+        ul.innerHTML = '<li style="color:var(--muted);padding:4px 8px">No mission active</li>';
+        return;
+      }
+      const currentWP = telem.wp || 0;
+      ul.innerHTML = wpList.map((wp, i) =>
+        `<li class="${i === currentWP ? 'active' : ''}">WP${i} — N:${wp.n.toFixed(1)}m  E:${wp.e.toFixed(1)}m</li>`
+      ).join('');
+    }
+
+    let wpOpen = true;
+    function toggleWP() {
+      wpOpen = !wpOpen;
+      document.getElementById('wp-list-wrap').style.maxHeight = wpOpen ? '200px' : '0';
+    }
+
+    let logOpen = true;
+    function toggleLog() {
+      logOpen = !logOpen;
+      document.getElementById('log-wrap').style.maxHeight = logOpen ? '200px' : '40px';
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  LOG
+    // ────────────────────────────────────────────────────────────
+    function addLog(msg) {
+      const ts = new Date().toTimeString().slice(0, 8);
+      logData.push({ ts, msg });
+      if (logData.length > 200) logData.shift();
+
+      // Keep only last 50 lines visible
+      const log = document.getElementById('log');
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.innerHTML = `<span class="log-ts">[${ts}]</span> ${msg}`;
+      log.appendChild(line);
+      while (log.children.length > 50) log.removeChild(log.firstChild);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function exportCSV() {
+      if (!logData.length) { alert('No log data yet.'); return; }
+      const rows = logData.map(l => `${l.ts},${l.msg.replace(/,/g, '|')}`);
+      const blob = new Blob(['time,message\n' + rows.join('\n')], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `dronenav_log_${Date.now()}.csv`;
+      a.click(); URL.revokeObjectURL(url);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  MODAL
+    // ────────────────────────────────────────────────────────────
+    function openModal(title, msg, onConfirm) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-msg').textContent = msg;
+      document.getElementById('modal-confirm').onclick = () => { onConfirm(); closeModal(); };
+      document.getElementById('modal-overlay').classList.add('show');
+    }
+    function closeModal() {
+      document.getElementById('modal-overlay').classList.remove('show');
+    }
+    document.getElementById('modal-overlay').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('modal-overlay')) closeModal();
+    });
+
+    // ────────────────────────────────────────────────────────────
+    //  MAP RESIZE
+    // ────────────────────────────────────────────────────────────
+    window.addEventListener('resize', () => { if (telem.north !== undefined) drawMap(telem); });
+
+    // ────────────────────────────────────────────────────────────
+    //  INIT
+    // ────────────────────────────────────────────────────────────
+    // Draw initial empty map
+    drawMap({ north: 0, east: 0, yaw: 0, wp: 0 });
+    drawCompass(0);
+    drawWindArrow(0, 0, 0);
+
+    // Connect to bridge
+    connect();
+
+    // Update WP list highlight as drone progresses
+    setInterval(() => { if (wpList.length) renderWPList(); }, 1000);
+  </script>
+</body>
+
+</html>

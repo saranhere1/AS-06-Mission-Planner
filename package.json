@@ -1,0 +1,13 @@
+{
+  "name": "dronenav-bridge",
+  "version": "4.0.0",
+  "description": "DroneNav ESP32 ↔ Dashboard bridge",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js"
+  },
+  "dependencies": {
+    "node-fetch": "2.7.0",
+    "ws": "8.16.0"
+  }
+}
